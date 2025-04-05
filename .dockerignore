@@ -1,0 +1,5 @@
+test/
+models/*.onnx
+!models/yolov8s_640.onnx
+!models/resnet_ens_11.19_e60_s0.782.pt
+!models/yolov8s_576x1024_v2.onnx
