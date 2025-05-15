@@ -1,8 +1,9 @@
 import textwrap
 from detector import Detector
-from generation_process import GenerationProcess
-from generation_process.resnet_ensamble import AttDataset
-
+#from generation_process import GenerationProcess
+#from generation_process.resnet_ensamble import AttDataset
+from generation_process_new.model_config import ATT_KEYS, CHECKPOINT_PATH
+from generation_process_new import GenerationProcess
 
 import numpy as np
 from dataclasses import dataclass, field
@@ -25,9 +26,9 @@ class __UniqueDict__(dict):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-MARK_UNPREPARED = __UniqueDict__({k:v for k,v in zip(AttDataset.ATT_KEYS, ['не определен' for _ in range(9)])})
-MARK_FILTERED = __UniqueDict__({k:v for k,v in zip(AttDataset.ATT_KEYS, ['не определен' for _ in range(9)])})
-MARK_IN_PROGRESS = __UniqueDict__({k:v for k,v in zip(AttDataset.ATT_KEYS, ['не определен' for _ in range(9)])})
+MARK_UNPREPARED = __UniqueDict__({k:v for k,v in zip(ATT_KEYS, ['не определен' for _ in range(9)])})  #AttDataset.ATT_KEYS in case of using old generation_process
+MARK_FILTERED = __UniqueDict__({k:v for k,v in zip(ATT_KEYS, ['не определен' for _ in range(9)])})
+MARK_IN_PROGRESS = __UniqueDict__({k:v for k,v in zip(ATT_KEYS, ['не определен' for _ in range(9)])})
 
 @dataclass
 class TrackData:
@@ -79,14 +80,14 @@ class SilhouetteDetector(Detector):
     @staticmethod
     def dets_filter_non_person(dets: list) -> list:
         return list(filter(lambda x: x[5] == 0, dets))
-    
+
     @staticmethod
     def dets_get_track_indices(dets: list) -> list:
         return [det[4] for det in dets]
 
     def capture_score(self, score, track_key, task_id) -> bool:
         return not track_key in self.TDD[task_id].scores or score > self.TDD[task_id].scores[track_key] + self.score_th_capture
-    
+
     def capture_enough_live(self, track_key, task_id) -> bool:
         return track_key in self.TDD[task_id].heartbeat_dict and\
         track_key in self.TDD[task_id].first_appearance_times and\
@@ -113,7 +114,7 @@ class SilhouetteDetector(Detector):
                         del data_dict[track_key]
                     except KeyError:
                         pass
-    
+
     def remove_stale_TD(self):
         now = time.time()
         for td_key, last_update_time in list(self.TD_heartbeat.items()):
@@ -139,7 +140,7 @@ class SilhouetteDetector(Detector):
                     self.logger.warning(f"There's no generation process of task {td_key}")
                 except Exception as e:
                     self.logger.error("Error while terminating and removing stale generation process")
-    
+
     def remove_GenP(self, task_id):
         try:
             self.GenPD[task_id].stop()
@@ -187,7 +188,7 @@ class SilhouetteDetector(Detector):
                 return result
             return wrapped
         return attr
-    
+
     def run(
         self, img: np.ndarray, task_id: int
     ) -> list:
@@ -205,17 +206,17 @@ class SilhouetteDetector(Detector):
         if not task_id in self.GenPD:
             self.GenPD[task_id] = GenerationProcess("Silhouette Attributes", self.logger, self.classifier_path)
             self.GenPD[task_id].start(True)
-    
+
         result_dets = []
         dets = self.dets_filter_non_person(
             Detector.run(self, img, task_id)
             )
 
         if len(dets) > 0:
-                
+
             self.TDD[task_id].update_tracks_appearence(
                 self.dets_get_track_indices(dets))
-            
+
             dets_filtered = self.filter_dets(dets, task_id)
 
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -223,7 +224,7 @@ class SilhouetteDetector(Detector):
             self.TDD[task_id].update_filtered_dets(dets_filtered, img, self.logger)
 
             track_keys_filtered = self.dets_get_track_indices(dets_filtered)
-            
+
             processed_track_keys = []
             try:
                 for track_key in track_keys_filtered:
@@ -263,11 +264,11 @@ class SilhouetteDetector(Detector):
             self.logger.warning("%s:\n%s", e, traceback.format_exc())
 
         return result_dets
-    
+
     @staticmethod
     def attributes_dict2text(attributes):
         res = ""
-        for idx, att in enumerate(AttDataset.ATT_KEYS):
+        for idx, att in enumerate(ATT_KEYS):
             res+=f"{idx+1}. {attributes[att]}\n"
         return res
 
@@ -307,12 +308,12 @@ class SilhouetteDetector(Detector):
             wrapped_text = textwrap.wrap(text, width=13) #width is chars long //8/21
             wtext_height = (cv2.getTextSize('H', font, font_size, font_thickness)[0][1] + int(width//2/192)) * len(wrapped_text)
             rightStick = True
-            if x1+(width//8) <= width:         
+            if x1+(width//8) <= width:
                 overlay = cv2.rectangle(overlay, (x1, y0), (int(x1+(width//8)), max(y1, y0 + wtext_height)), (0,0,0), cv2.FILLED)
             else:
                 rightStick = False
                 overlay = cv2.rectangle(overlay, (int(x0-(width//8)), y0), (x0, max(y1, y0 + wtext_height)), (0,0,0), cv2.FILLED)
-            #x, y = x1 + int(width//2/192), y0 #10   
+            #x, y = x1 + int(width//2/192), y0 #10
             for i_line, line in enumerate(wrapped_text):
                 textsize = cv2.getTextSize(line, font, font_size, font_thickness)[0]
                 gap = textsize[1] + int(width//2/192)#10
@@ -328,12 +329,12 @@ class SilhouetteDetector(Detector):
             inf_img[mask] = cv2.addWeighted(inf_img, alpha, overlay, 1 - alpha, 0)[mask]
             for line, x, y in lines_info:
                 cv2.putText(inf_img, line, (x, y), font,
-                            font_size, 
-                            (255,255,255), 
-                            font_thickness, 
+                            font_size,
+                            (255,255,255),
+                            font_thickness,
                             lineType = cv2.LINE_AA)
         return inf_img
 
 
 if __name__ == "silhouette_detector":
-    detector = SilhouetteDetector("./models/yolov8s_576x1024_v2.onnx", "./models/resnet_ens_11.19_e60_s0.782.pt")
+    detector = SilhouetteDetector("./models/yolov8s_576x1024_v2.onnx", CHECKPOINT_PATH)

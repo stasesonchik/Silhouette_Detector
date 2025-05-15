@@ -1,5 +1,8 @@
+#detector base
+
 --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
-onnxruntime-gpu
+--extra-index-url https://download.pytorch.org/whl/cu121
+onnxruntime-gpu==1.18.0
 fastapi>=0.110.0
 opencv-python==4.9.0.80
 requests>=2.31.0
@@ -11,6 +14,20 @@ lap==0.5.12
 python-multipart>=0.0.9
 ffmpeg-python>=0.2.0
 pydantic>=2.9.1
-torch==2.1.2
-torchvision==0.16.2
+torch==2.3.1
+torchaudio==2.3.1
+torchvision==0.18.1
 -e ./boxmot
+
+# MiniCPM-o 2.6
+
+transformers==4.44.2
+sentencepiece==0.2.0
+vector-quantize-pytorch==1.18.5
+vocos==0.1.0
+accelerate==1.2.1
+timm==0.9.10
+soundfile==0.12.1
+librosa==0.9.0
+decord
+moviepy

@@ -24,7 +24,7 @@ def main(name: str,
     except Exception:
         logger.warning(f"No such device: {device}! Classifier model is running on CPU")
         device = "cpu"
-    
+
     logger.info(f"Classifier model is running on device: {device}")
 
     while not stop_event.is_set():
@@ -39,7 +39,7 @@ def main(name: str,
 
         except Empty:
             logger.warning(f"Queue of images is empty")
-        
+
         except Full:
             logger.warning(f"Queue of texts is full")
 

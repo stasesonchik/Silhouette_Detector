@@ -20,6 +20,7 @@ import cv2
 import ffmpeg
 import numpy as np
 import requests
+import time
 from fastapi import FastAPI
 
 from api import create_app
@@ -527,6 +528,9 @@ class Base(ABC):
             An excerpt with all the saved results
             of an excerpt from an RTSP video stream.
         """
+
+        start_time = time.time()
+
         params = InferenceCycleParameters(
             is_realtime=properties.get("isRealtime", False),
             ffprobe_params=self._ffprobe_read(video_url),
@@ -557,6 +561,8 @@ class Base(ABC):
         )
         timestamp_thread.start()
         self.logger.debug("frame_id\tframe_timestamp\tprogress")
+
+
         while self.task_params[task_id].inference_status == StatusTask.RUNNING:
             frame = self._get_frame(read_process, params.ffprobe_params)
             if frame is None:
@@ -584,13 +590,17 @@ class Base(ABC):
 
             # Sending data to the sending queue
             if params.is_realtime:
-                data_frame = {
-                    "fps": params.ffprobe_params.fps,
-                    "duration": params.ffprobe_params.duration,
-                    "timestamp": current_timestamp,
-                    "result": result,
-                }
-                session.put(cv2.cvtColor(inf_img, cv2.COLOR_BGR2RGB), data_frame)
+                # Только после warmup_duration секунд начинаем отправку
+                if time.time() - start_time >= 3:
+                    data_frame = {
+                        "fps": params.ffprobe_params.fps,
+                        "duration": params.ffprobe_params.duration,
+                        "timestamp": current_timestamp,
+                        "result": result,
+                    }
+                    session.put(cv2.cvtColor(inf_img, cv2.COLOR_BGR2RGB), data_frame)
+                else:
+                    self.logger.debug("Warming up... not sending predictions yet.")
 
             self.task_params[task_id].progress = (
                 self.task_params[task_id].frame_processed
@@ -679,17 +689,17 @@ class Base(ABC):
             "tsLastFrame": self.task_params[task_id].ts_last_processed,
             "results": results,
         }
-        """
-        response = requests.post(
+
+        """response = requests.post(
             f"http://{self.task_params[task_id].host_ip}:{general_cfg['manager_port']}/task/results/{task_id}",
             json=response_content,
             timeout=90,
         )
-        
+
         self.logger.info(
             "Response from manager after complete task: %s", response.json()
-        )
-        """
+        )"""
+
         self.task_params.pop(task_id)
         self.trackers.pop(task_id)
         while not self.timestamps[task_id].empty():
